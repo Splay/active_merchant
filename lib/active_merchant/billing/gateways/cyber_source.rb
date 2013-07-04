@@ -1,3 +1,5 @@
+require File.dirname(__FILE__) + '/paypal_express_common'
+
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     # See the remote and mocked unit test files for example usage.  Pay special
@@ -24,10 +26,14 @@ module ActiveMerchant #:nodoc:
     #   calculating tax/VAT.
     # * All transactions use dollar values.
     class CyberSourceGateway < Gateway
+      # needed for redirect_url
+      include PaypalExpressCommon
+
       self.test_url = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
       self.live_url = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
+      self.test_redirect_url = 'https://www.sandbox.paypal.com/cgi-bin/webscr'
 
-      XSD_VERSION = "1.69"
+      XSD_VERSION = "1.47"
 
       # visa, master, american_express, discover
       self.supported_cardtypes = [:visa, :master, :american_express, :discover]
@@ -184,6 +190,76 @@ module ActiveMerchant #:nodoc:
         commit(build_retrieve_subscription_request(reference, options), options)
       end
 
+
+      def paypal_setup(money, options = {})
+        requires!(options, :order_id, :paypal)
+        requires!(options[:paypal], :return_url, :cancel_return_url)
+        setup_address_hash(options)
+        # payPalEcSetService
+
+        # Required fields
+        # payPalEcSetService_run 
+        # payPalEcSetService_paypalReturn
+        # payPalEcSetService_paypalCancelReturn
+        # merchantID -> add_merchant_data (in build_request)
+        # merchantReferenceCode
+        # purchaseTotals_currency  GBP -> add_purchase_data 
+        # purchaseTotals_grandTotalAmount or at least one item_#_unitPrice field -> add_purchase_data
+
+        # Optional
+        # Address -> use add_address
+
+        commit(build_paypal_set_service_request(money, options), options)
+      end
+
+      def paypal_details_for(options = {})
+        requires!(options, :order_id, :paypal)
+        # requires!(options[:paypal], :token, :ec_set_service_request_id, :ec_set_service_request_token)
+        # Required fields
+
+        # payPalEcGetDetailsService_run
+        # payPalEcGetDetailsService_paypalToken
+        # payPalEcGetDetailsService_paypalEcSetRequestID
+        # payPalEcGetDetailsService_paypalEcSetRequestToken
+        # merchantID
+        # merchantReferenceCode
+        commit(build_paypal_details_for(options), options)
+      end
+
+
+      def paypal_order_setup(money, options = {})
+        requires!(options, :order_id, :paypal)
+        # requires!(options[:paypal], :token, :ec_set_service_request_id, :ec_set_service_request_token, :payer_id, :customer_email)
+
+        commit(build_paypal_setup_order_request(money, options), options)
+      end
+
+      def paypal_authorize(money, options = {})
+        requires!(options, :order_id, :paypal)
+        # requires!(options[:paypal], :token, :ec_order_setup_request_id, :ec_order_setup_request_token, :paypal_order_id, :payer_id, :customer_email)
+
+        commit(build_paypal_authorization_request(money, options), options)
+      end
+
+      def paypal_capture(money, options = {})
+        requires!(options, :order_id, :paypal)
+
+        commit(build_paypal_capture_request(money, options), options)
+      end
+      
+
+      def paypal_refund(money, options = {})
+        requires!(options, :order_id, :paypal)
+        
+        commit( build_paypal_refund_request(money, options), options)
+      end
+
+      def paypal_auth_reversal(options = {})
+        requires!(options, :order_id, :paypal)
+
+        commit(build_paypal_auth_reversal_request(options), options)
+      end
+
       # CyberSource requires that you provide line item information for tax
       # calculations. If you do not have prices for each item or want to
       # simplify the situation then pass in one fake line item that costs the
@@ -333,6 +409,56 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
+      def build_paypal_set_service_request(money, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_purchase_data(xml, money, true, options)
+        add_paypal_service_and_data(xml, 'payPalEcSetService',options)
+        add_address(xml, nil, options[:billing_address], options, false)  if !options[:email].blank? && !options[:billing_address].blank?
+        add_address(xml, nil, options[:shipping_address], options, true)  if !options[:email].blank? && !options[:shipping_address].blank?
+        xml.target!
+      end
+
+      def build_paypal_details_for(options)
+        xml = Builder::XmlMarkup.new :indent => 2        
+        add_paypal_service_and_data(xml, 'payPalEcGetDetailsService',options)
+        xml.target!
+      end
+
+      def build_paypal_setup_order_request(money, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_purchase_data(xml, money, true, options)
+        add_paypal_service_and_data(xml, 'payPalEcOrderSetupService',options)
+        xml.target!
+      end
+
+      def build_paypal_authorization_request(money, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        xml.tag! 'billTo' do
+          xml.tag! 'email',  options[:email]
+        end          
+        add_purchase_data(xml, money, true, options)
+        add_paypal_service_and_data(xml, 'payPalAuthorizationService',options)
+        xml.target!
+      end
+
+      def build_paypal_capture_request(money, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_purchase_data(xml, money, true, options)
+        add_paypal_service_and_data(xml, 'payPalDoCaptureService',options)
+      end
+
+      def build_paypal_refund_request(money, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_purchase_data(xml, money, true, options)
+        add_paypal_service_and_data(xml, 'payPalRefundService',options)
+      end
+
+      def build_paypal_auth_reversal_request(money, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_paypal_service_and_data(xml, 'payPalAuthReversalService',options)        
+      end
+
+
       def add_business_rules_data(xml)
         xml.tag! 'businessRules' do
           xml.tag!('ignoreAVSResult', 'true') if @options[:ignore_avs]
@@ -371,8 +497,13 @@ module ActiveMerchant #:nodoc:
         requires!(options, :email)
 
         xml.tag! shipTo ? 'shipTo' : 'billTo' do
-          xml.tag! 'firstName',             creditcard.first_name             if creditcard
-          xml.tag! 'lastName',              creditcard.last_name              if creditcard
+          if address[:first_name] && address[:last_name]
+            xml.tag! 'firstName',           address[:first_name]
+            xml.tag! 'lastName',            address[:last_name]
+          elsif creditcard            
+            xml.tag! 'firstName',             creditcard.first_name
+            xml.tag! 'lastName',              creditcard.last_name 
+          end
           xml.tag! 'street1',               address[:address1]
           xml.tag! 'street2',               address[:address2]                unless address[:address2].blank?
           xml.tag! 'city',                  address[:city]
@@ -495,6 +626,85 @@ module ActiveMerchant #:nodoc:
           add_purchase_data(xml, money, true, options)
           add_creditcard(xml, creditcard_or_reference)
         end
+      end
+
+      def add_paypal_service_and_data(xml, paypal_call, options)
+        po = options[:paypal] || {}
+
+        # All request fields to paypal need to be prefixed with the current method call
+        xml.tag! paypal_call, {'run' => 'true'}  do
+          xml.tag! 'invoiceNumber',                   po[:invoice_number]                                   if po[:invoice_number] 
+
+          xml.tag! 'requestBillingAddress',           po[:request_billing_address]                          if po[:request_billing_address]
+          # xml.tag! 'run',                            (po[:run] ?  'true' : 'false')                         if po[:run]
+          # xml.tag! 'paypal' do
+
+            # Required for set service payPalEcSetService
+            xml.tag! 'paypalReturn',                        po[:return_url]                                       if po[:return_url]            
+            xml.tag! 'paypalCancelReturn',                  po[:cancel_return_url]                                if po[:cancel_return_url]
+            
+            xml.tag! 'paypalOrderId',                       po[:paypal_order_id]                                  if po[:paypal_order_id]
+            
+
+            xml.tag! 'paypalEcOrderSetupRequestID',         po[:order_setup_request_id]                        if po[:order_setup_request_id]
+            xml.tag! 'paypalEcOrderSetupRequestToken',      po[:order_setup_request_token]                     if po[:order_setup_request_token]
+
+            # Required for getting details, order setup and payments (payPalEcGetDetails, payPalEcDoPayment, payPalEcOrderSetup)
+            xml.tag! 'paypalToken',                         po[:token]                                          if po[:token]
+            xml.tag! 'paypalPayerId',                       po[:payer_id]                                         if po[:payer_id]            
+            xml.tag! 'paypalCustomerEmail',                 po[:customer_email]                                   if po[:customer_email]
+            xml.tag! 'paypalEcSetRequestID',                po[:set_service_request_id]                         if po[:set_service_request_id]
+            xml.tag! 'paypalEcSetRequestToken',             po[:set_service_request_token]                      if po[:set_service_request_token]
+
+
+            # xml.tag! 'AddressOverride',             !!po[:address_override]
+            xml.tag! 'paypalAuthorizationId',               po[:authorization_id]                                 if  po[:authorization_id]
+            xml.tag! 'completeType',                       (po[:partial_capture] ?  'NotComplete' : 'Complete')   if !po[:partial_capture].nil?
+            xml.tag! 'paypalAuthorizationRequestID',        po[:authorization_request_id]                         if  po[:authorization_request_id]
+            xml.tag! 'paypalAuthorizationRequestToken',     po[:authorization_request_token]                      if  po[:authorization_request_token]
+
+            
+            # Required for Refund (payPalRefund)
+            xml.tag! 'paypalDoCaptureRequestID',            po[:capture_request_id]                            if po[:capture_request_id]
+            xml.tag! 'paypalDoCaptureRequestToken',         po[:capture_request_token]                         if po[:capture_request_token]
+            xml.tag! 'paypalCaptureId',                     po[:capture_id]                                       if po[:capture_id]
+
+
+            # Required for Authorizations (payPalAuthorization)
+            xml.tag! 'paypalDoRefTransactionRequestID',     po[:ref_transaction_request_id]                    if po[:ref_transaction_request_id]
+            xml.tag! 'paypalDoRefTransactionRequestToken',  po[:ref_transaction_request_token]                 if po[:ref_transaction_request_token]
+
+
+            # Required for capture and auth reversal (payPalDoCapture, payPalAuthReversal)
+            xml.tag! 'paypalEcDoPaymentRequestID',          po[:payment_request_id]                         if po[:payment_request_id]
+            xml.tag! 'paypalEcDoPaymentRequestToken',       po[:payment_request_token]                      if po[:payment_request_token]
+
+            # required for setting order, doing payment and authorization  (payPalEcDoPayment, payPalEcOrderSetup, payPalAuthorization)
+
+
+
+
+            # Optional
+            xml.tag! 'paypalDesc',                          po[:description]                                      if po[:description]
+            xml.tag! 'paypalEcNotifyUrl',                   po[:notify_url]                                    if po[:notify_url]
+            xml.tag! 'paypalNoshipping',                    po[:no_shipping_address]                              if po[:no_shipping_address] # Display Shipping Address?
+            xml.tag! 'paypalReqconfirmshipping',            po[:requires_confirmed_shipping_address]              if po[:requires_confirmed_shipping_address]
+
+
+            # Optional Design Settings
+            xml.tag! 'paypalHdrbackcolor',                  po[:header_background_color]                          if po[:header_background_color]
+            xml.tag! 'paypalHdrbordercolor',                po[:header_border_color]                              if po[:header_border_color]
+            xml.tag! 'paypalHdrimg',                        po[:header_img]                                       if po[:header_img]
+            xml.tag! 'paypalLogoimg',                       po[:logo_img]                                         if po[:logo_img]
+            xml.tag! 'paypalPagestyle',                     po[:page_style]                                       if po[:page_style]
+            xml.tag! 'paypalPayflowcolor',                  po[:payflow_color]                                    if po[:payflow_color]
+
+
+
+          # end
+
+        end
+
       end
 
       # Where we actually build the full SOAP request using builder
