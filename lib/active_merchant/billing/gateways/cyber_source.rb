@@ -541,7 +541,7 @@ module ActiveMerchant #:nodoc:
         add_paypal_service_and_data(xml, 'payPalRefundService',options)
       end
 
-      def build_paypal_auth_reversal_request(money, options)
+      def build_paypal_auth_reversal_request(options)
         xml = Builder::XmlMarkup.new :indent => 2
         add_paypal_service_and_data(xml, 'payPalAuthReversalService',options)        
       end
