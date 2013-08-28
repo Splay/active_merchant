@@ -497,7 +497,7 @@ module ActiveMerchant #:nodoc:
       def build_paypal_set_service_request(money, options)
         xml = Builder::XmlMarkup.new :indent => 2
         add_line_item_data(xml, options) if options[:line_items]
-        add_purchase_data(xml, money, true, options)
+        add_purchase_data(xml, money, !options[:line_items], options)
         add_paypal_service_and_data(xml, 'payPalEcSetService',options)
         add_address(xml, nil, options[:billing_address], options, false)  if !options[:email].blank? && !options[:billing_address].blank?
         add_address(xml, nil, options[:shipping_address], options, true)  if !options[:email].blank? && !options[:shipping_address].blank?
