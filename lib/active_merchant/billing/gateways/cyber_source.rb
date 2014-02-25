@@ -553,6 +553,7 @@ module ActiveMerchant #:nodoc:
             xml.tag! 'productCode', value[:code] || 'shipping_only'
             xml.tag! 'productName', value[:description]
             xml.tag! 'productSKU', value[:sku]
+            xml.tag! 'taxAmount', value[:tax] if value[:tax]
           end
         end
       end
