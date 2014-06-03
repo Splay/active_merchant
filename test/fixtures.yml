@@ -316,6 +316,7 @@ garanti:
   merchant_id: 7000679
   password: "123qweASD"
 
+
 global_collect:
   merchant_id: 1428
   api_key_id: 96f16a41890565d0
@@ -325,6 +326,12 @@ global_transport:
   global_user_name: "USERNAME"
   global_password: "PASSWORD"
   term_type: "ABC"
+
+gmo:
+  login: tshop00001193
+  password: qducy9yq
+  #login: tshop00003807
+  #password: gzuzbcmr
 
 hdfc:
   login: LOGIN
