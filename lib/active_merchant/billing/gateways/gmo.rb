@@ -478,7 +478,7 @@ module ActiveMerchant #:nodoc:
       # @param [Hash]    options     The options the user passed to the class
       def add_currency_code(parameters, money, options)
         parameters[:currency] = options[:currency] || currency(money)
-        unless parameters[:currency] == 'JPY'
+        unless parameters[:currency].to_s == 'JPY'
           raise ArgumentError.new("Parameter: currency may only be JPY")
         end
       end
