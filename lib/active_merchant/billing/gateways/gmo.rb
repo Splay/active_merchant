@@ -630,7 +630,7 @@ module ActiveMerchant #:nodoc:
         data[:ShopPass] = @options[:password]
         data[:OrderID]  = parameters[:OrderID]
         data[:JobCd]    = process
-        data[:Amount]   = amount(money)
+        data[:Amount]   = amount(money) / 100
         data[:Tax]      = '0'
 
         [url, data.to_query]
@@ -681,7 +681,7 @@ module ActiveMerchant #:nodoc:
         data[:AccessPass]   = parameters[:AccessPass]
         data[:JobCd]        = process
         if money
-          data[:Amount] = amount(money)
+          data[:Amount] = amount(money) / 100
           data[:Tax]    = '0'
         end
 
