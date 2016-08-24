@@ -502,7 +502,8 @@ module ActiveMerchant #:nodoc:
         parameters[:SecurityCode] = creditcard.verification_value
 
         # The GMO API doesn't have name fields, so we add them to the client field
-        parameters[:ClientField1] = "#{creditcard.first_name} #{creditcard.last_name} #{parameters[:ClientField1]}".strip
+        # Unfortunately, the clientfield doesn't accept Japanese Characters so we cannot add the name there
+        parameters[:ClientField1] = "#{parameters[:ClientField1]}".strip
       end
 
       # The API expects the expiration date in YYMM format
