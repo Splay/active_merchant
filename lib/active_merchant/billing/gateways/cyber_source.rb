@@ -53,7 +53,8 @@ module ActiveMerchant #:nodoc:
         :visa  => '001',
         :master => '002',
         :american_express => '003',
-        :discover => '004'
+        :discover => '004',
+        :jcb => '007'
       }
 
       # map response codes to something humans can read
