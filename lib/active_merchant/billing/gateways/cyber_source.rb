@@ -435,9 +435,16 @@ module ActiveMerchant #:nodoc:
 
       def build_paypal_authorization_request(money, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        xml.tag! 'billTo' do
-          xml.tag! 'email',  options[:email]
-        end          
+
+        if options[:billing_address] || options[:shipping_address]
+          add_address(xml, nil, options[:billing_address], options, false)  if !options[:email].blank? && !options[:billing_address].blank?
+          add_address(xml, nil, options[:shipping_address], options, true)  if !options[:email].blank? && !options[:shipping_address].blank?
+        else
+          xml.tag! 'billTo' do
+            xml.tag! 'email',  options[:email]
+          end
+        end
+
         add_purchase_data(xml, money, true, options)
         add_paypal_service_and_data(xml, 'payPalAuthorizationService',options)
         xml.target!
