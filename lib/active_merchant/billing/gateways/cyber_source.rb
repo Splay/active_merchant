@@ -666,8 +666,9 @@ module ActiveMerchant #:nodoc:
             xml.tag! 'paypalEcSetRequestID',                po[:set_service_request_id]                         if po[:set_service_request_id]
             xml.tag! 'paypalEcSetRequestToken',             po[:set_service_request_token]                      if po[:set_service_request_token]
 
-
-            # xml.tag! 'AddressOverride',             !!po[:address_override]
+            # Customer-supplied address sent in the SetExpressCheckout request rather than the address on file with PayPal for this customer.
+            xml.tag! 'paypalAddressOverride',             !!po[:address_override]                                 if po[:address_override] 
+            
             xml.tag! 'paypalAuthorizationId',               po[:authorization_id]                                 if  po[:authorization_id]
             xml.tag! 'completeType',                       (po[:partial_capture] ?  'NotComplete' : 'Complete')   if !po[:partial_capture].nil?
             xml.tag! 'paypalAuthorizationRequestID',        po[:authorization_request_id]                         if  po[:authorization_request_id]
