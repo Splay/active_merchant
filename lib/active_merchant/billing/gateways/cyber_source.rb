@@ -411,11 +411,11 @@ module ActiveMerchant #:nodoc:
 
       def build_paypal_set_service_request(money, options)
         xml = Builder::XmlMarkup.new :indent => 2
+        add_address(xml, nil, options[:billing_address], options, false)  if !options[:email].blank? && !options[:billing_address].blank?
+        add_address(xml, nil, options[:shipping_address], options, true)  if !options[:email].blank? && !options[:shipping_address].blank?
         add_line_item_data(xml, options) if options[:line_items]
         add_purchase_data(xml, money, !options[:line_items], options)
         add_paypal_service_and_data(xml, 'payPalEcSetService',options)
-        add_address(xml, nil, options[:billing_address], options, false)  if !options[:email].blank? && !options[:billing_address].blank?
-        add_address(xml, nil, options[:shipping_address], options, true)  if !options[:email].blank? && !options[:shipping_address].blank?
         xml.target!
       end
 
@@ -452,6 +452,16 @@ module ActiveMerchant #:nodoc:
 
       def build_paypal_capture_request(money, options)
         xml = Builder::XmlMarkup.new :indent => 2
+
+        if options[:billing_address] || options[:shipping_address]
+          add_address(xml, nil, options[:billing_address], options, false)  if !options[:email].blank? && !options[:billing_address].blank?
+          add_address(xml, nil, options[:shipping_address], options, true)  if !options[:email].blank? && !options[:shipping_address].blank?
+        else
+          xml.tag! 'billTo' do
+            xml.tag! 'email',  options[:email]
+          end
+        end
+
         add_purchase_data(xml, money, true, options)
         add_paypal_service_and_data(xml, 'payPalDoCaptureService',options)
       end
@@ -517,7 +527,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'street1',               address[:address1]
           xml.tag! 'street2',               address[:address2]                unless address[:address2].blank?
           xml.tag! 'city',                  address[:city]
-          xml.tag! 'state',                 address[:state]
+          xml.tag! 'state',                 address[:state] || ""
           xml.tag! 'postalCode',            address[:zip]
           xml.tag! 'country',               address[:country]
           xml.tag! 'company',               address[:company]                 unless address[:company].blank?
@@ -666,8 +676,6 @@ module ActiveMerchant #:nodoc:
             xml.tag! 'paypalEcSetRequestID',                po[:set_service_request_id]                         if po[:set_service_request_id]
             xml.tag! 'paypalEcSetRequestToken',             po[:set_service_request_token]                      if po[:set_service_request_token]
 
-            # Customer-supplied address sent in the SetExpressCheckout request rather than the address on file with PayPal for this customer.
-            xml.tag! 'paypalAddressOverride',             !!po[:address_override]                                 if po[:address_override] 
             
             xml.tag! 'paypalAuthorizationId',               po[:authorization_id]                                 if  po[:authorization_id]
             xml.tag! 'completeType',                       (po[:partial_capture] ?  'NotComplete' : 'Complete')   if !po[:partial_capture].nil?
@@ -698,7 +706,11 @@ module ActiveMerchant #:nodoc:
             # Optional
             xml.tag! 'paypalDesc',                          po[:description]                                      if po[:description]
             xml.tag! 'paypalEcNotifyUrl',                   po[:notify_url]                                    if po[:notify_url]
-            xml.tag! 'paypalNoshipping',                    po[:no_shipping_address]                              if po[:no_shipping_address] # Display Shipping Address?
+            xml.tag! 'paypalNoshipping',                    1                              if po[:no_shipping_address] # Display Shipping Address?
+
+            # Customer-supplied address sent in the SetExpressCheckout request rather than the address on file with PayPal for this customer.
+            xml.tag! 'paypalAddressOverride',               1                                                   if po[:address_override] 
+
             xml.tag! 'paypalReqconfirmshipping',            po[:requires_confirmed_shipping_address]              if po[:requires_confirmed_shipping_address]
 
 
