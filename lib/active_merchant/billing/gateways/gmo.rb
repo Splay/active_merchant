@@ -497,9 +497,13 @@ module ActiveMerchant #:nodoc:
       # @param [Hash]        parameters  The data to be sent to the API
       # @param [CreditCard]  creditcard  The CreditCard object for the user
       def add_creditcard(parameters, creditcard)
-        parameters[:CardNo]       = creditcard.number
-        parameters[:Expire]       = expdate(creditcard)
-        parameters[:SecurityCode] = creditcard.verification_value
+        if creditcard.respond_to?(:token) && creditcard.token
+          parameters[:Token]        = creditcard.token
+        else
+          parameters[:CardNo]       = creditcard.number
+          parameters[:Expire]       = expdate(creditcard)
+          parameters[:SecurityCode] = creditcard.verification_value
+        end
 
         # The GMO API doesn't have name fields, so we add them to the client field
         # Unfortunately, the clientfield doesn't accept Japanese Characters so we cannot add the name there
@@ -653,9 +657,16 @@ module ActiveMerchant #:nodoc:
         data[:AccessPass]   = create_response[:AccessPass]
         data[:OrderID]      = parameters[:OrderID]
         data[:Method]       = '1' # Single lump-sum payment
-        data[:CardNo]       = parameters[:CardNo]
-        data[:Expire]       = parameters[:Expire]
-        data[:SecurityCode] = parameters[:SecurityCode]
+
+        # Handle tokens instead of credit card data
+        if parameters[:Token]
+          data[:Token]      = parameters[:Token]
+        else
+          data[:CardNo]       = parameters[:CardNo]
+          data[:Expire]       = parameters[:Expire]
+          data[:SecurityCode] = parameters[:SecurityCode]
+        end
+
         data[:ClientField1] = clean_client_field(parameters[:ClientField1])
         data[:ClientField2] = clean_client_field(parameters[:ClientField2])
         data[:ClientField3] = clean_client_field(parameters[:ClientField3])
