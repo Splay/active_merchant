@@ -362,6 +362,24 @@ module ActiveMerchant #:nodoc:
         commit('AUTH', money, parameters)
       end
 
+
+      # Authorizes an amount with ApplePay
+      #
+      # @param [Integer]    money       The number of yen
+      # @param [Hash]       options     Please note that addresses are not sent to the API since it does not have fields for such
+      # @return [MultiResponse]  Information about the authorization
+      def authorize_apple_pay(money, options = {})
+        parameters = {}
+        parameters[:TokenType] = :apple_pay
+        parameters[:Token] = options[:token]
+
+        add_currency_code(parameters, money, options)
+        add_invoice(parameters, options)
+        add_customer_data(parameters, options)
+
+        commit('AUTH', money, parameters)
+      end
+
       # Captures the money from a previous authorization
       #
       # @param [Integer] money          The number of yen
@@ -370,6 +388,7 @@ module ActiveMerchant #:nodoc:
       # @return [Response]  Information about the capture
       def capture(money, authorization, options = {})
         parameters = extract_authorization(authorization, {})
+        parameters[:TokenType] = options[:token_type] if options[:token_type]
 
         commit('SALES', money, parameters)
       end
@@ -390,6 +409,24 @@ module ActiveMerchant #:nodoc:
         commit('CAPTURE', money, parameters)
       end
 
+      # Peforms an ApplePay instant purchase
+      #
+      # @param [Integer]    money       The number of yen
+      # @param [Hash]       options     Please note that addresses are not sent to the API since it does not have fields for such
+      # @return [MultiResponse]  Information about the purchase
+      def purchase_apple_pay(money, creditcard, options = {})
+        parameters = {}
+        parameters[:TokenType] = :apple_pay
+        parameters[:Token] = options[:token]
+
+        add_currency_code(parameters, money, options)
+        add_invoice(parameters, options)
+        add_customer_data(parameters, options)
+
+        commit('CAPTURE', money, parameters)
+      end
+
+
       # Cancels a transaction
       #
       # @param [String]  authorization  The authorization attribute of the Response object (AccessID-AccessPass)
@@ -397,6 +434,7 @@ module ActiveMerchant #:nodoc:
       # @return [Response]  Information about the void - authorization will be the same as what was passed as the authorization
       def void(authorization, options = {})
         parameters = extract_authorization(authorization, {})
+        parameters[:TokenType] = options[:token_type] if options[:token_type]
 
         commit('VOID', nil, parameters)
       end
@@ -409,6 +447,7 @@ module ActiveMerchant #:nodoc:
       # @return [Response]  Information about the refund - authorization will be the same as what was passed as the identification
       def refund(money, identification, options = {})
         parameters = extract_authorization(identification, {})
+        parameters[:TokenType] = options[:token_type] if options[:token_type]
 
         commit('REFUND', money, parameters)
       end
@@ -457,6 +496,7 @@ module ActiveMerchant #:nodoc:
       # @param [Hash] options     The options the user passed to the class
       def add_customer_data(parameters, options)
         if options.has_key? :email
+          parameters[:ClientField1] ||= ""
           parameters[:ClientField1] += " <#{options[:email]}>"
           parameters[:ClientField1].lstrip!
         end
@@ -534,14 +574,26 @@ module ActiveMerchant #:nodoc:
           first_response = nil
           response = MultiResponse.run do |r|
             r.process do
-              data = ssl_post *create_transaction_data(process, money, parameters)
+
+              if parameters[:TokenType] == :apple_pay
+                data = ssl_post *create_apple_pay_transaction_data(process, money, parameters)
+              else
+                data = ssl_post *create_transaction_data(process, money, parameters)
+              end
+
               first_response_data = parse_response(data)
               first_response = create_response(first_response_data)
             end
 
             if first_response.success?
               r.process do
-                data = ssl_post *execute_transaction_data(first_response_data, parameters)
+
+                if parameters[:TokenType] == :apple_pay
+                  data = ssl_post *execute_apple_pay_transaction_data(first_response_data, parameters)
+                else
+                  data = ssl_post *execute_transaction_data(first_response_data, parameters)
+                end
+
                 second_response_data = parse_response(data)
                 create_response(second_response_data, first_response_data)
               end
@@ -554,10 +606,17 @@ module ActiveMerchant #:nodoc:
         if process == 'REFUND'
           # REFUND isn't a real process, instead it triggers a call to the
           # change API endpoint using the CAPTURE process
-          data = ssl_post *change_alter_transaction_data('ChangeTran', 'CAPTURE', money, parameters)
+
+          if parameters[:TokenType] == :apple_pay
+            data = ssl_post *refund_apple_pay_transaction_data(money, parameters)
+          else
+            data = ssl_post *change_alter_transaction_data('ChangeTran', 'CAPTURE', money, parameters)
+          end
+
           response_data = parse_response(data)
 
         elsif process == 'SEARCH'
+
           data = ssl_post *search_transaction_data(parameters)
           response_data = parse_response(data)
 
@@ -567,7 +626,12 @@ module ActiveMerchant #:nodoc:
             money = nil
           end
 
-          data = ssl_post *change_alter_transaction_data('AlterTran', process, money, parameters)
+          if parameters[:TokenType] == :apple_pay
+            data = ssl_post *alter_apple_pay_transaction_data(process, money, parameters)
+          else
+            data = ssl_post *change_alter_transaction_data('AlterTran', process, money, parameters)
+          end
+
           response_data = parse_response(data)
         end
 
@@ -670,6 +734,87 @@ module ActiveMerchant #:nodoc:
         data[:ClientField1] = clean_client_field(parameters[:ClientField1])
         data[:ClientField2] = clean_client_field(parameters[:ClientField2])
         data[:ClientField3] = clean_client_field(parameters[:ClientField3])
+
+        [url, data.to_query]
+      end
+
+      # Creates the URL and POST data for registering an Apple Pay transaction. Corresponds
+      # to the EntryTranBrandToken.idPass API endpoint.
+      #
+      # @param [String]  process     "AUTH" or "CAPTURE"
+      # @param [Integer] money       The number of yen
+      # @param [Hash]    parameters  Data for the request, using symbol keys
+      # @return [Array]  First element is [String] URL, second is [String] post data
+      def create_apple_pay_transaction_data(process, money, parameters)
+        url = make_url('EntryTranBrandtoken')
+
+        data = {}
+        data[:Version]  = '105'
+        data[:ShopID]   = @options[:login]
+        data[:ShopPass] = @options[:password]
+        data[:OrderID]  = parameters[:OrderID]
+        data[:JobCd]    = process
+        data[:Amount]   = amount(money).to_i / 100
+        data[:Tax]      = '0'
+
+        [url, data.to_query]
+      end
+
+      # Creates the URL and POST data to execute an Apple Pay transaction that has been
+      # registered via create_transaction_data(). Corresponds with the
+      # ExecTran.isPass API endpoint.
+      #
+      # @param [Hash] create_response  The parsed response from create_transaction_data()
+      # @param [Hash] parameters       Data for the request, using symbol keys
+      # @return [Array]  First element is [String] URL, second is [String] post data
+      def execute_apple_pay_transaction_data(create_response, parameters)
+        url = make_url('ExecTranBrandtoken')
+
+        data = {}
+        data[:Version]      = '105'
+        data[:AccessID]     = create_response[:AccessID]
+        data[:AccessPass]   = create_response[:AccessPass]
+        data[:OrderID]      = parameters[:OrderID]
+        data[:Method]       = '1' # Single lump-sum payment
+
+        # Use 
+        data[:Token]        = parameters[:Token]
+        data[:TokenType]    = parameters[:TokenType] || :apple_pay
+
+        data[:ClientField1] = clean_client_field(parameters[:ClientField1])
+        data[:ClientField2] = clean_client_field(parameters[:ClientField2])
+        data[:ClientField3] = clean_client_field(parameters[:ClientField3])
+
+        [url, data.to_query]
+      end      
+
+
+      # Creates the URL and POST data for modifying apple pay transactions. Corresponds
+      # to VoidTranBrandtoken and SalesTranBrandToken.
+      # Adapated this to follow the same interface as the non apple pay calls
+      #
+      # @param [String]  process     "CAPTURE", "RETURN", "VOID" or "SALES"
+      # @param [Integer] money       The number of yen
+      # @param [Hash]    parameters  Data for the request, using symbol keys
+      # @return [Array]  First element is [String] URL, second is [String] post data      
+      def alter_apple_pay_transaction_data(process, money, parameters)
+        cmd = case process
+        when "VOID"; "VoidTranBrandtoken"
+        when "SALES"; "SalesTranBrandtoken"
+        when "RETURN"; "VoidTranBrandtoken" # Return doesn't exist with Apple Pay
+        end
+
+        url = make_url(cmd)
+
+        data = {}
+        data[:Version]      = '105'
+        data[:AccessID]     = create_response[:AccessID]
+        data[:AccessPass]   = create_response[:AccessPass]
+        data[:OrderID]      = parameters[:OrderID]
+        
+        if process == "SALES"
+          data[:Amount] = amount(money).to_i / 100
+        end
 
         [url, data.to_query]
       end
