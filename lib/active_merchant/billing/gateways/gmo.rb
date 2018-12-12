@@ -370,7 +370,7 @@ module ActiveMerchant #:nodoc:
       # @return [MultiResponse]  Information about the authorization
       def authorize_apple_pay(money, options = {})
         parameters = {}
-        parameters[:TokenType] = :apple_pay
+        parameters[:TokenType] = 'APay'
         parameters[:Token] = options[:token]
 
         add_currency_code(parameters, money, options)
@@ -416,7 +416,7 @@ module ActiveMerchant #:nodoc:
       # @return [MultiResponse]  Information about the purchase
       def purchase_apple_pay(money, creditcard, options = {})
         parameters = {}
-        parameters[:TokenType] = :apple_pay
+        parameters[:TokenType] = 'APay'
         parameters[:Token] = options[:token]
 
         add_currency_code(parameters, money, options)
@@ -434,7 +434,7 @@ module ActiveMerchant #:nodoc:
       # @return [Response]  Information about the void - authorization will be the same as what was passed as the authorization
       def void(authorization, options = {})
         parameters = extract_authorization(authorization, {})
-        parameters[:TokenType] = options[:token_type] if options[:token_type]
+        parameters[:TokenType] = 'APay' if options[:token_type] == :apple_pay
 
         commit('VOID', nil, parameters)
       end
@@ -447,7 +447,7 @@ module ActiveMerchant #:nodoc:
       # @return [Response]  Information about the refund - authorization will be the same as what was passed as the identification
       def refund(money, identification, options = {})
         parameters = extract_authorization(identification, {})
-        parameters[:TokenType] = options[:token_type] if options[:token_type]
+        parameters[:TokenType] = 'APay' if options[:token_type] == :apple_pay
 
         commit('REFUND', money, parameters)
       end
@@ -575,7 +575,7 @@ module ActiveMerchant #:nodoc:
           response = MultiResponse.run do |r|
             r.process do
 
-              if parameters[:TokenType] == :apple_pay
+              if parameters[:TokenType] == 'APay'
                 data = ssl_post *create_apple_pay_transaction_data(process, money, parameters)
               else
                 data = ssl_post *create_transaction_data(process, money, parameters)
@@ -588,7 +588,7 @@ module ActiveMerchant #:nodoc:
             if first_response.success?
               r.process do
 
-                if parameters[:TokenType] == :apple_pay
+                if parameters[:TokenType] == 'APay'
                   data = ssl_post *execute_apple_pay_transaction_data(first_response_data, parameters)
                 else
                   data = ssl_post *execute_transaction_data(first_response_data, parameters)
@@ -607,7 +607,7 @@ module ActiveMerchant #:nodoc:
           # REFUND isn't a real process, instead it triggers a call to the
           # change API endpoint using the CAPTURE process
 
-          if parameters[:TokenType] == :apple_pay
+          if parameters[:TokenType] == 'APay'
             data = ssl_post *refund_apple_pay_transaction_data(money, parameters)
           else
             data = ssl_post *change_alter_transaction_data('ChangeTran', 'CAPTURE', money, parameters)
@@ -626,7 +626,7 @@ module ActiveMerchant #:nodoc:
             money = nil
           end
 
-          if parameters[:TokenType] == :apple_pay
+          if parameters[:TokenType] == 'APay'
             data = ssl_post *alter_apple_pay_transaction_data(process, money, parameters)
           else
             data = ssl_post *change_alter_transaction_data('AlterTran', process, money, parameters)
@@ -750,8 +750,10 @@ module ActiveMerchant #:nodoc:
 
         data = {}
         data[:Version]  = '105'
+
         data[:ShopID]   = @options[:login]
         data[:ShopPass] = @options[:password]
+
         data[:OrderID]  = parameters[:OrderID]
         data[:JobCd]    = process
         data[:Amount]   = amount(money).to_i / 100
@@ -774,12 +776,16 @@ module ActiveMerchant #:nodoc:
         data[:Version]      = '105'
         data[:AccessID]     = create_response[:AccessID]
         data[:AccessPass]   = create_response[:AccessPass]
+        
+        data[:ShopID]       = @options[:login]
+        data[:ShopPass]     = @options[:password]        
+        
         data[:OrderID]      = parameters[:OrderID]
         data[:Method]       = '1' # Single lump-sum payment
 
         # Use 
         data[:Token]        = parameters[:Token]
-        data[:TokenType]    = parameters[:TokenType] || :apple_pay
+        data[:TokenType]    = parameters[:TokenType] || 'APay'
 
         data[:ClientField1] = clean_client_field(parameters[:ClientField1])
         data[:ClientField2] = clean_client_field(parameters[:ClientField2])
@@ -811,7 +817,10 @@ module ActiveMerchant #:nodoc:
         data[:AccessID]     = create_response[:AccessID]
         data[:AccessPass]   = create_response[:AccessPass]
         data[:OrderID]      = parameters[:OrderID]
-        
+
+        data[:ShopID]       = @options[:login]
+        data[:ShopPass]     = @options[:password]        
+
         if process == "SALES"
           data[:Amount] = amount(money).to_i / 100
         end
@@ -832,8 +841,10 @@ module ActiveMerchant #:nodoc:
 
         data = {}
         data[:Version]      = '105'
+        
         data[:ShopID]       = @options[:login]
         data[:ShopPass]     = @options[:password]
+
         data[:AccessID]     = parameters[:AccessID]
         data[:AccessPass]   = parameters[:AccessPass]
         data[:JobCd]        = process
