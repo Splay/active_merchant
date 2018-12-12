@@ -388,7 +388,7 @@ module ActiveMerchant #:nodoc:
       # @return [Response]  Information about the capture
       def capture(money, authorization, options = {})
         parameters = extract_authorization(authorization, {})
-        parameters[:TokenType] = options[:token_type] if options[:token_type]
+        parameters[:TokenType] = options[:token_type] if options[:token_type] == :apple_pay
 
         commit('SALES', money, parameters)
       end
