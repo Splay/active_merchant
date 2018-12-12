@@ -373,6 +373,10 @@ module ActiveMerchant #:nodoc:
         parameters[:TokenType] = 'APay'
         parameters[:Token] = options[:token]
 
+        if parameters[:Token].is_a?(Hash)
+          parameters[:Token] = Base64.encode64(parameters[:Token].to_json)
+        end
+
         add_currency_code(parameters, money, options)
         add_invoice(parameters, options)
         add_customer_data(parameters, options)
@@ -417,7 +421,10 @@ module ActiveMerchant #:nodoc:
       def purchase_apple_pay(money, creditcard, options = {})
         parameters = {}
         parameters[:TokenType] = 'APay'
-        parameters[:Token] = options[:token]
+        
+        if parameters[:Token].is_a?(Hash)
+          parameters[:Token] = Base64.encode64(parameters[:Token].to_json)
+        end
 
         add_currency_code(parameters, money, options)
         add_invoice(parameters, options)
