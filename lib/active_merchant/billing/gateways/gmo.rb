@@ -393,7 +393,7 @@ module ActiveMerchant #:nodoc:
       def capture(money, authorization, options = {})
         parameters = extract_authorization(authorization, {})
         parameters[:TokenType] = 'APay' if options[:token_type] == :apple_pay
-        parameters[:OrderId]   = options[:order_id] if options[:order_id]
+        parameters[:OrderID]   = options[:order_id] if options[:order_id]
 
         commit('SALES', money, parameters)
       end
@@ -443,7 +443,7 @@ module ActiveMerchant #:nodoc:
       def void(authorization, options = {})
         parameters = extract_authorization(authorization, {})
         parameters[:TokenType] = 'APay' if options[:token_type] == :apple_pay
-        parameters[:OrderId]   = options[:order_id] if options[:order_id]
+        parameters[:OrderID]   = options[:order_id] if options[:order_id]
 
         commit('VOID', nil, parameters)
       end
@@ -457,7 +457,7 @@ module ActiveMerchant #:nodoc:
       def refund(money, identification, options = {})
         parameters = extract_authorization(identification, {})
         parameters[:TokenType] = 'APay' if options[:token_type] == :apple_pay
-        parameters[:OrderId]   = options[:order_id] if options[:order_id]
+        parameters[:OrderID]   = options[:order_id] if options[:order_id]
 
         commit('REFUND', money, parameters)
       end
