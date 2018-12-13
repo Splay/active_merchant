@@ -618,7 +618,7 @@ module ActiveMerchant #:nodoc:
           # change API endpoint using the CAPTURE process
 
           if parameters[:TokenType] == 'APay'
-            data = ssl_post *refund_apple_pay_transaction_data(money, parameters)
+            data = ssl_post *alter_apple_pay_transaction_data("REFUND", money, parameters)
           else
             data = ssl_post *change_alter_transaction_data('ChangeTran', 'CAPTURE', money, parameters)
           end
@@ -818,6 +818,7 @@ module ActiveMerchant #:nodoc:
         when "VOID"; "VoidTranBrandtoken"
         when "SALES"; "SalesTranBrandtoken"
         when "RETURN"; "VoidTranBrandtoken" # Return doesn't exist with Apple Pay
+        when "REFUND"; "RefundTranBrandtoken"
         end
 
         url = make_url(cmd)
@@ -836,12 +837,9 @@ module ActiveMerchant #:nodoc:
           data[:Tax]    = '0'
         end
 
-        if process == "SALES"
-          data[:Amount] = amount(money).to_i / 100
-        end
-
         [url, data.to_query]
       end
+
 
       # Creates the URL and POST data for modifying transactions. Corresponds
       # to the ChangeTran.idPass and AlterTran.idPass API endpoints.
