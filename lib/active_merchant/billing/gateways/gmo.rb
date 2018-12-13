@@ -821,12 +821,17 @@ module ActiveMerchant #:nodoc:
 
         data = {}
         data[:Version]      = '105'
-        data[:AccessID]     = create_response[:AccessID]
-        data[:AccessPass]   = create_response[:AccessPass]
+        data[:AccessID]     = parameters[:AccessID]
+        data[:AccessPass]   = parameters[:AccessPass]
         data[:OrderID]      = parameters[:OrderID]
 
         data[:ShopID]       = @options[:login]
         data[:ShopPass]     = @options[:password]        
+
+        if money
+          data[:Amount] = amount(money).to_i / 100
+          data[:Tax]    = '0'
+        end
 
         if process == "SALES"
           data[:Amount] = amount(money).to_i / 100
