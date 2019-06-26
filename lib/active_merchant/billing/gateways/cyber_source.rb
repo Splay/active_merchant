@@ -544,7 +544,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'street1',               address[:address1]
           xml.tag! 'street2',               address[:address2]                unless address[:address2].blank?
           xml.tag! 'city',                  address[:city]
-          xml.tag! 'state',                 address[:state] || ""
+          xml.tag! 'state',                 address[:state]                   unless address[:state].blank?
           xml.tag! 'postalCode',            address[:zip]
           xml.tag! 'country',               address[:country]
           xml.tag! 'company',               address[:company]                 unless address[:company].blank?
