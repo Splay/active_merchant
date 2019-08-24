@@ -94,7 +94,9 @@ module ActiveMerchant #:nodoc:
         :r247 => 'You requested a credit for a capture that was previously voided',
         :r250 => 'The request was received, but a time-out occurred with the payment processor',
         :r254 => 'Your CyberSource account is prohibited from processing stand-alone refunds',
-        :r255 => 'Your CyberSource account is not configured to process the service in the country you specified'
+        :r255 => 'Your CyberSource account is not configured to process the service in the country you specified',
+        :r475 => "Card enrolled in a payer authentication program",
+        :r476 => "3D Secure Failed"
       }
 
       # These are the options that can be used when creating a new CyberSource
@@ -125,6 +127,13 @@ module ActiveMerchant #:nodoc:
         setup_address_hash(options)
         commit(build_auth_request(money, creditcard_or_reference, options), :authorize, money, options)
       end
+
+      def check_enrollment(money, creditcard, options)
+        if options[:reference_id] 
+          options[:payer_auth_enroll_service] ||= {:reference_id => options.delete(:reference_id)}
+        end
+        commit(build_check_enrollment_request(money, creditcard, options), :authorize, money, options)
+      end 
 
       def capture(money, authorization, options = {})
         setup_address_hash(options)
@@ -276,6 +285,13 @@ module ActiveMerchant #:nodoc:
 
         xml.target!
       end
+
+      def build_check_enrollment_request(money, creditcard, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_creditcard_or_subscription(xml, money, creditcard, options)
+        add_threeds_services(xml, options)
+        xml.target!
+      end      
 
       def build_tax_calculation_request(creditcard, options)
         xml = Builder::XmlMarkup.new :indent => 2
@@ -781,10 +797,17 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_threeds_services(xml, options)
-        xml.tag! 'payerAuthEnrollService', {'run' => 'true'} if options[:payer_auth_enroll_service]
+        if options[:payer_auth_enroll_service]
+          xml.tag! 'payerAuthEnrollService', {'run' => 'true'} do 
+            xml.tag! "referenceID", options[:payer_auth_enroll_service][:reference_id] if options[:payer_auth_enroll_service][:reference_id]
+            xml.tag! "authenticationTransactionID", options[:payer_auth_enroll_service][:authentication_transaction_id] if options[:payer_auth_enroll_service][:authentication_transaction_id]
+          end
+        end
         if options[:payer_auth_validate_service]
           xml.tag! 'payerAuthValidateService', {'run' => 'true'} do
-            xml.tag! 'signedPARes', options[:pares]
+            xml.tag! 'signedPARes', options[:payer_auth_validate_service][:pares] if options[:payer_auth_validate_service][:pares]
+            xml.tag! 'referenceID', options[:payer_auth_validate_service][:reference_id] if options[:payer_auth_validate_service][:reference_id]
+            xml.tag! 'authenticationTransactionID', options[:payer_auth_validate_service][:authentication_transaction_id] if options[:payer_auth_validate_service][:authentication_transaction_id]
           end
         end
       end
