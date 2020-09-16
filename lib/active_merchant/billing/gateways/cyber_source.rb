@@ -33,7 +33,7 @@ module ActiveMerchant #:nodoc:
       self.live_url = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
       self.test_redirect_url = 'https://www.sandbox.paypal.com/cgi-bin/webscr'
 
-      XSD_VERSION = "1.153"
+      XSD_VERSION = "1.166"
 
       # visa, master, american_express, discover
       self.supported_cardtypes = [:visa, :master, :american_express, :discover]
@@ -131,6 +131,11 @@ module ActiveMerchant #:nodoc:
         requires!(options,  :order_id)
         setup_address_hash(options)
         commit(build_auth_request(money, creditcard_or_reference, options), options )
+      end
+
+      # Used for 3DS Direct API
+      def payer_auth_setup(creditcard, options = {})
+        commit(build_payer_auth_setup_request(creditcard), options)
       end
 
       def check_enrollment(money, creditcard, options)
@@ -316,6 +321,13 @@ module ActiveMerchant #:nodoc:
         add_auth_service(xml)
         add_threeds_services(xml, options)
         add_business_rules_data(xml)
+        xml.target!
+      end
+
+      def build_payer_auth_setup_request(creditcard)
+        xml = Builder::XmlMarkup.new :indent => 2
+        add_creditcard(xml, creditcard)
+        xml.tag! 'payerAuthSetupService', {'run' => 'true'}
         xml.target!
       end
 
