@@ -679,11 +679,12 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_threeds_services(xml, options)
+ def add_threeds_services(xml, options)
         if options[:payer_auth_enroll_service]
           xml.tag! 'payerAuthEnrollService', {'run' => 'true'} do 
             xml.tag! "referenceID", options[:payer_auth_enroll_service][:reference_id] if options[:payer_auth_enroll_service][:reference_id]
             xml.tag! "authenticationTransactionID", options[:payer_auth_enroll_service][:authentication_transaction_id] if options[:payer_auth_enroll_service][:authentication_transaction_id]
+            xml.tag! "returnURL", options[:payer_auth_enroll_service][:return_url] if options[:payer_auth_enroll_service][:return_url]
           end
         end
         if options[:payer_auth_validate_service]
