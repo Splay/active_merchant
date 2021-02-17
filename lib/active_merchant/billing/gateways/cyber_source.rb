@@ -91,7 +91,8 @@ module ActiveMerchant #:nodoc:
         :r254 => "Your CyberSource account is prohibited from processing stand-alone refunds",
         :r255 => "Your CyberSource account is not configured to process the service in the country you specified",
         :r475 => "Card enrolled in a payer authentication program",
-        :r476 => "3D Secure Failed"
+        :r476 => "3D Secure Failed",
+        :r478 => "SCA is required for this transaction"
       }
 
       # These are the options that can be used when creating a new CyberSource
